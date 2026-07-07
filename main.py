@@ -8,6 +8,9 @@ from scipy.ndimage import gaussian_filter, maximum_filter, label
 from scipy.interpolate import griddata
 import io
 
+import kaleido
+kaleido.get_chrome_sync()
+
 st.set_page_config(layout="wide", page_title="TM2 Analiz Sistemi v2.0", page_icon="🔍")
 if "clear_cache" not in st.session_state:
     st.cache_data.clear()
