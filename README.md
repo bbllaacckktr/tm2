@@ -1,2 +1,2 @@
 # tm2
-tm2 analiz
+tm2 csv dosyalarının analizi için oluşturulmuş açık kaynak kodlu, ücretsiz... 
