@@ -270,7 +270,7 @@ elif filter_type == "Yukarı Devam (Upward)":
 else:
     filter_params = {}
 colorscale = st.sidebar.selectbox("Renk Paleti", ["RdBu_r", "Jet", "Viridis", "Plasma", "Turbo", "Earth"], index=0)
-peak_threshold = st.sidebar.slider("İkincil Hedef Duyarlılığı", 0.2, 0.99, 0.99, 0.01)
+peak_threshold = st.sidebar.slider("İkincil Hedef Duyarlılığı", 0.2, 0.99, 0.89, 0.01)
 min_peak_distance = st.sidebar.slider("Min. Hedef Mesafesi (piksel)", 5, 20, 10, 1)
 show_analytic = st.sidebar.checkbox("Analitik Sinyal Katmanı", True)
 show_tilt = st.sidebar.checkbox("Tilt Angle Filtresi", False)
