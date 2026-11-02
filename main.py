@@ -2,14 +2,29 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import plotly.io as pio
+try:
+    import plotly.io as pio
+    HAS_KALEIDO = True
+except Exception:
+    HAS_KALEIDO = False
 from plotly.subplots import make_subplots
 from scipy.ndimage import gaussian_filter, maximum_filter, label
 from scipy.interpolate import griddata
 import io
 
 
+
 st.set_page_config(layout="wide", page_title="TM2 Analiz Sistemi v2.0", page_icon="🔍")
+st.markdown("""
+<style>
+/* Tablet dokunmatik iyileştirme */
+.stToggle label { min-height: 44px !important; padding: 10px 0 !important; }
+.stToggle [data-baseweb="toggle"] { transform: scale(1.3); transform-origin: left; }
+.stCheckbox label, .stRadio label { padding: 12px 0 !important; min-height: 44px !important; }
+.stCheckbox input[type="checkbox"], .stRadio input[type="radio"] { width: 24px; height: 24px; }
+</style>
+""", unsafe_allow_html=True)
+
 if "clear_cache" not in st.session_state:
     st.cache_data.clear()
     st.session_state["clear_cache"] = True
@@ -90,12 +105,12 @@ def compute_confidence(signal, noise, min_conf=50.0, max_conf=99.5):
 
 def export_chart(fig, filename, fmt="png", width=1200, height=600):
     """Plotly grafiğini PNG veya PDF olarak dışa aktar."""
+    if not HAS_KALEIDO:
+        return None
     try:
         scale = 2 if fmt == "png" else 1
         return pio.to_image(fig, format=fmt, width=width, height=height, scale=scale)
     except Exception:
-        import traceback
-        st.error(f"{fmt.upper()} dönüştürme hatası: {traceback.format_exc()}")
         return None
 
 
@@ -221,11 +236,11 @@ with st.spinner("Veri işleniyor..."):
 # ─────────────────────────────────────────────────────────
 val_arr = df["value"].values.astype(float)
 st.sidebar.header("🎛️ Filtre & Görsel Ayarları")
-auto_params = st.sidebar.checkbox("🎯 Otomatik Parametre", False,
-                                  help="Filtre parametrelerini veri istatistiğine göre otomatik ayarlar")
+auto_params = st.sidebar.selectbox("🎯 Otomatik Parametre", ["Hayır", "Evet"], index=0,
+                                   help="Filtre parametrelerini veri istatistiğine göre otomatik ayarlar") == "Evet"
 grid_resolution = st.sidebar.slider("Grid Çözünürlüğü", 50, 500, 200, 10,
                                     help="Düşük → hızlı, yüksek → detaylı (200 önerilir)")
-detrend_on = st.sidebar.checkbox("Detrend (Saha Eğimi Kaldır)", True)
+detrend_on = st.sidebar.selectbox("Detrend (Saha Eğimi Kaldır)", ["Evet", "Hayır"], index=0) == "Evet"
 filter_type = st.sidebar.selectbox("Filtre Türü", [
     "Gauss Alçak Geçiren",
     "Butterworth Alçak Geçiren",
@@ -269,25 +284,25 @@ elif filter_type == "Yukarı Devam (Upward)":
 else:
     filter_params = {}
 colorscale = st.sidebar.selectbox("Renk Paleti", ["RdBu_r", "Jet", "Viridis", "Plasma", "Turbo", "Earth"], index=0)
-peak_threshold = st.sidebar.slider("İkincil Hedef Duyarlılığı", 0.2, 0.99, 0.89, 0.01)
+peak_threshold = st.sidebar.slider("İkincil Hedef Duyarlılığı", 0.2, 0.99, 0.99, 0.01)
 min_peak_distance = st.sidebar.slider("Min. Hedef Mesafesi (piksel)", 5, 20, 10, 1)
-show_analytic = st.sidebar.checkbox("Analitik Sinyal Katmanı", True)
-show_tilt = st.sidebar.checkbox("Tilt Angle Filtresi", False)
-show_raw_compare = st.sidebar.checkbox("Ham-Filtreli Karşılaştırma", True)
-show_3d_analytic = st.sidebar.checkbox("3D Analitik Sinyal", False)
+show_analytic = st.sidebar.selectbox("Analitik Sinyal Katmanı", ["Evet", "Hayır"], index=0) == "Evet"
+show_tilt = st.sidebar.selectbox("Tilt Angle Filtresi", ["Hayır", "Evet"], index=0) == "Evet"
+show_raw_compare = st.sidebar.selectbox("Ham-Filtreli Karşılaştırma", ["Evet", "Hayır"], index=0) == "Evet"
+show_3d_analytic = st.sidebar.selectbox("3D Analitik Sinyal", ["Hayır", "Evet"], index=0) == "Evet"
 st.sidebar.markdown("---")
 st.sidebar.markdown("**📏 Derinlik Tahmini**")
-show_depth = st.sidebar.checkbox("Derinlik Tahmini (Analitik Sinyal)", True)
+show_depth = st.sidebar.selectbox("Derinlik Tahmini (Analitik Sinyal)", ["Evet", "Hayır"], index=0) == "Evet"
 st.sidebar.markdown("---")
 st.sidebar.markdown("**🧹 Outlier Temizleme**")
-remove_outliers = st.sidebar.checkbox("Outlier Temizle", True,
-                                      help="IQR yöntemi ile aşırı uç değerleri temizler")
+remove_outliers = st.sidebar.selectbox("Outlier Temizle", ["Evet", "Hayır"], index=0,
+                                       help="IQR yöntemi ile aşırı uç değerleri temizler") == "Evet"
 outlier_iqr = st.sidebar.slider("IQR Eşiği", 0.5, 5.0, 1.5, 0.1,
                                 help="Düşük → agresif temizlik (çok nokta silinir), yüksek → koruyucu (az nokta silinir)")
 outlier_status = st.sidebar.empty()
 st.sidebar.markdown("---")
 st.sidebar.markdown("**📊 Profil Kesiti**")
-profile_dir = st.sidebar.radio("Profil Yönü", ["X", "Y"], horizontal=True, index=0)
+profile_dir = st.sidebar.selectbox("Profil Yönü", ["X", "Y"], index=0)
 profile_min = float(min(df["x"].min(), df["y"].min()))
 profile_max = float(max(df["x"].max(), df["y"].max()))
 profile_val = st.sidebar.slider("Profil Değeri", profile_min, profile_max, 30.0, 1.0)
@@ -660,12 +675,12 @@ with tab2:
         st.plotly_chart(fig3, use_container_width=True)
         # 3D dışa aktar
         e3 = st.columns(2)
-        e3[0].download_button("📷 3D PNG", export_chart(fig3, "3d_model", "png"), "3d_model.png", "image/png")
-        try:
-            pdf3 = pio.to_image(fig3, format="pdf", width=1200, height=600)
+        png3 = export_chart(fig3, "3d_model", "png")
+        if png3:
+            e3[0].download_button("📷 3D PNG", png3, "3d_model.png", "image/png")
+        pdf3 = export_chart(fig3, "3d_model", "pdf")
+        if pdf3:
             e3[1].download_button("📄 3D PDF", pdf3, "3d_model.pdf", "application/pdf")
-        except Exception:
-            pass
 
 # ──────── TAB 3: İSTATİSTİK ────────
 with tab3:
