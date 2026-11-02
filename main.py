@@ -2,11 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-try:
-    import plotly.io as pio
-    HAS_KALEIDO = True
-except Exception:
-    HAS_KALEIDO = False
 from plotly.subplots import make_subplots
 from scipy.ndimage import gaussian_filter, maximum_filter, label
 from scipy.interpolate import griddata
@@ -15,16 +10,6 @@ import io
 
 
 st.set_page_config(layout="wide", page_title="TM2 Analiz Sistemi v2.0", page_icon="🔍")
-st.markdown("""
-<style>
-/* Tablet dokunmatik iyileştirme */
-.stToggle label { min-height: 44px !important; padding: 10px 0 !important; }
-.stToggle [data-baseweb="toggle"] { transform: scale(1.3); transform-origin: left; }
-.stCheckbox label, .stRadio label { padding: 12px 0 !important; min-height: 44px !important; }
-.stCheckbox input[type="checkbox"], .stRadio input[type="radio"] { width: 24px; height: 24px; }
-</style>
-""", unsafe_allow_html=True)
-
 if "clear_cache" not in st.session_state:
     st.cache_data.clear()
     st.session_state["clear_cache"] = True
@@ -101,17 +86,6 @@ def compute_confidence(signal, noise, min_conf=50.0, max_conf=99.5):
         snr = 10 * np.log10(signal_power / noise_power)
         return max(min_conf, min(max_conf, 65.0 + (snr * 1.8)))
     return 75.0
-
-
-def export_chart(fig, filename, fmt="png", width=1200, height=600):
-    """Plotly grafiğini PNG veya PDF olarak dışa aktar."""
-    if not HAS_KALEIDO:
-        return None
-    try:
-        scale = 2 if fmt == "png" else 1
-        return pio.to_image(fig, format=fmt, width=width, height=height, scale=scale)
-    except Exception:
-        return None
 
 
 def fft_filter(grid, dx, dy, filter_type="gaussian", sigma=1.0, cutoff=0.15, order=4, height=10.0,
@@ -236,11 +210,11 @@ with st.spinner("Veri işleniyor..."):
 # ─────────────────────────────────────────────────────────
 val_arr = df["value"].values.astype(float)
 st.sidebar.header("🎛️ Filtre & Görsel Ayarları")
-auto_params = st.sidebar.selectbox("🎯 Otomatik Parametre", ["Hayır", "Evet"], index=0,
-                                   help="Filtre parametrelerini veri istatistiğine göre otomatik ayarlar") == "Evet"
+auto_params = st.sidebar.checkbox("🎯 Otomatik Parametre", False,
+                                  help="Filtre parametrelerini veri istatistiğine göre otomatik ayarlar")
 grid_resolution = st.sidebar.slider("Grid Çözünürlüğü", 50, 500, 200, 10,
                                     help="Düşük → hızlı, yüksek → detaylı (200 önerilir)")
-detrend_on = st.sidebar.selectbox("Detrend (Saha Eğimi Kaldır)", ["Evet", "Hayır"], index=0) == "Evet"
+detrend_on = st.sidebar.checkbox("Detrend (Saha Eğimi Kaldır)", True)
 filter_type = st.sidebar.selectbox("Filtre Türü", [
     "Gauss Alçak Geçiren",
     "Butterworth Alçak Geçiren",
@@ -284,28 +258,25 @@ elif filter_type == "Yukarı Devam (Upward)":
 else:
     filter_params = {}
 colorscale = st.sidebar.selectbox("Renk Paleti", ["RdBu_r", "Jet", "Viridis", "Plasma", "Turbo", "Earth"], index=0)
-peak_threshold = st.sidebar.slider("İkincil Hedef Duyarlılığı", 0.2, 0.99, 0.99, 0.01)
+peak_threshold = st.sidebar.slider("İkincil Hedef Duyarlılığı", 0.2, 0.99, 0.55, 0.01)
 min_peak_distance = st.sidebar.slider("Min. Hedef Mesafesi (piksel)", 5, 20, 10, 1)
-show_analytic = st.sidebar.selectbox("Analitik Sinyal Katmanı", ["Evet", "Hayır"], index=0) == "Evet"
-show_tilt = st.sidebar.selectbox("Tilt Angle Filtresi", ["Hayır", "Evet"], index=0) == "Evet"
-show_raw_compare = st.sidebar.selectbox("Ham-Filtreli Karşılaştırma", ["Evet", "Hayır"], index=0) == "Evet"
-show_3d_analytic = st.sidebar.selectbox("3D Analitik Sinyal", ["Hayır", "Evet"], index=0) == "Evet"
+show_analytic = st.sidebar.checkbox("Analitik Sinyal Katmanı", True)
+show_tilt = st.sidebar.checkbox("Tilt Angle Filtresi", False)
+show_raw_compare = st.sidebar.checkbox("Ham-Filtreli Karşılaştırma", True)
+show_3d_analytic = st.sidebar.checkbox("3D Analitik Sinyal", False)
 st.sidebar.markdown("---")
 st.sidebar.markdown("**📏 Derinlik Tahmini**")
-show_depth = st.sidebar.selectbox("Derinlik Tahmini (Analitik Sinyal)", ["Evet", "Hayır"], index=0) == "Evet"
+show_depth = st.sidebar.checkbox("Derinlik Tahmini (Analitik Sinyal)", True)
 st.sidebar.markdown("---")
 st.sidebar.markdown("**🧹 Outlier Temizleme**")
-remove_outliers = st.sidebar.selectbox("Outlier Temizle", ["Evet", "Hayır"], index=0,
-                                       help="IQR yöntemi ile aşırı uç değerleri temizler") == "Evet"
+remove_outliers = st.sidebar.checkbox("Outlier Temizle", True,
+                                      help="IQR yöntemi ile aşırı uç değerleri temizler")
 outlier_iqr = st.sidebar.slider("IQR Eşiği", 0.5, 5.0, 1.5, 0.1,
                                 help="Düşük → agresif temizlik (çok nokta silinir), yüksek → koruyucu (az nokta silinir)")
-outlier_status = st.sidebar.empty()
 st.sidebar.markdown("---")
 st.sidebar.markdown("**📊 Profil Kesiti**")
-profile_dir = st.sidebar.selectbox("Profil Yönü", ["X", "Y"], index=0)
-profile_min = float(min(df["x"].min(), df["y"].min()))
-profile_max = float(max(df["x"].max(), df["y"].max()))
-profile_val = st.sidebar.slider("Profil Değeri", profile_min, profile_max, 30.0, 1.0)
+profile_dir = st.sidebar.radio("Profil Yönü", ["X", "Y"], horizontal=True, index=0)
+profile_val = st.sidebar.number_input("Profil konumu (cm)", value=30.0, step=1.0)
 
 # ─────────────────────────────────────────────────────────
 # SİNYAL İSLEME
@@ -326,7 +297,7 @@ if remove_outliers:
     removed = before - after
     if after >= 10 and after < before:
         df = df[mask].reset_index(drop=True)
-        outlier_status.success(f"🧹 {removed} outlier temizlendi ({before}→{after})")
+        st.sidebar.success(f"🧹 {removed} outlier temizlendi ({before}→{after})")
         val_arr = df["value"].values.astype(float)
         x_arr = df["x"].values.astype(float)
         y_arr = df["y"].values.astype(float)
@@ -531,20 +502,6 @@ with tab1:
                 showlegend=False
             ), row=1, col=1)
 
-        # Kazı alanı dikdörtgeni (ana hedef merkezli, min 100cm, harita sınırlarına kırpılmış)
-        kazi_yarim = max((max_anom_x - min_anom_x) / 2, 50)
-        kazi_x0 = max(df["x"].min(), c_x - kazi_yarim)
-        kazi_x1 = min(df["x"].max(), c_x + kazi_yarim)
-        kazi_y0 = max(df["y"].min(), c_y - kazi_yarim)
-        kazi_y1 = min(df["y"].max(), c_y + kazi_yarim)
-        fig1.add_shape(type="rect",
-                       x0=kazi_x0, y0=kazi_y0, x1=kazi_x1, y1=kazi_y1,
-                       line=dict(color="red", width=2, dash="dot"),
-                       fillcolor="rgba(255,0,0,0.05)", row=1, col=1)
-        fig1.add_trace(go.Scatter(x=[None], y=[None], mode="lines",
-                       line=dict(color="red", width=2, dash="dot"),
-                       name="Kazı Alanı", showlegend=True), row=1, col=1)
-
         if second_z is not None:
             cs = "RdBu_r" if second_z is tilt_grid else colorscale
             fig1.add_trace(go.Contour(
@@ -573,17 +530,13 @@ with tab1:
 
     # Profil kesiti (X veya Y yönünde)
     if is_2d:
+        st.subheader(f"📈 {profile_dir} = {profile_val:.0f} cm Profil Kesiti")
         if profile_dir == "X":
-            uniq_vals = df["x"].unique()
-            nearest = uniq_vals[np.abs(uniq_vals - profile_val).argmin()]
-            prof_data = df[df["x"] == nearest]
-            x_axis, x_label = "y", "Y (cm)"
+            prof_data = df[(df["x"] >= profile_val - 2) & (df["x"] <= profile_val + 2)]
+            x_axis, x_label = "y", f"Y (cm)"
         else:
-            uniq_vals = df["y"].unique()
-            nearest = uniq_vals[np.abs(uniq_vals - profile_val).argmin()]
-            prof_data = df[df["y"] == nearest]
-            x_axis, x_label = "x", "X (cm)"
-        st.subheader(f"📈 {profile_dir} = {nearest:.0f} cm Profil Kesiti")
+            prof_data = df[(df["y"] >= profile_val - 2) & (df["y"] <= profile_val + 2)]
+            x_axis, x_label = "x", f"X (cm)"
         if len(prof_data) > 2:
             fig_prof = go.Figure()
             fig_prof.add_trace(go.Scatter(x=prof_data[x_axis], y=prof_data["filtered_value"],
@@ -595,27 +548,6 @@ with tab1:
             fig_prof.add_hline(y=mean_val - 2 * std_val, line=dict(color="orange", dash="dash"), annotation_text="-2\u03c3")
             fig_prof.update_layout(height=300, xaxis_title=x_label, yaxis_title="Sinyal", hovermode="x unified")
             st.plotly_chart(fig_prof, use_container_width=True)
-
-    # Dışa aktar butonları
-    exp_cols = st.columns(3)
-    if is_2d:
-        png_bytes = export_chart(fig1, "manyetik_harita", "png")
-        if png_bytes:
-            exp_cols[0].download_button("📷 Harita PNG", png_bytes,
-                                          "manyetik_harita.png", "image/png")
-        pdf_bytes = export_chart(fig1, "manyetik_harita", "pdf")
-        if pdf_bytes:
-            exp_cols[1].download_button("📄 Harita PDF", pdf_bytes, "manyetik_harita.pdf", "application/pdf")
-        else:
-            exp_cols[1].info("PDF dönüştürme başarısız")
-        has_profile = len(prof_data) > 2
-        if has_profile:
-            fig_p = go.Figure()
-            fig_p.add_trace(go.Scatter(x=prof_data[x_axis], y=prof_data["filtered_value"], mode="lines", name="Filtrelenmiş"))
-            fig_p.update_layout(height=300)
-            prof_png = export_chart(fig_p, "profil", "png")
-            if prof_png:
-                exp_cols[2].download_button("📈 Profil PNG", prof_png, "profil.png", "image/png")
 
 # ──────── TAB 2: 3D MODEL ────────
 with tab2:
@@ -673,14 +605,6 @@ with tab2:
         ))
         fig3.update_layout(height=580, scene=dict(xaxis_title="", yaxis_title="Y (cm)", zaxis_title="Sinyal"))
         st.plotly_chart(fig3, use_container_width=True)
-        # 3D dışa aktar
-        e3 = st.columns(2)
-        png3 = export_chart(fig3, "3d_model", "png")
-        if png3:
-            e3[0].download_button("📷 3D PNG", png3, "3d_model.png", "image/png")
-        pdf3 = export_chart(fig3, "3d_model", "pdf")
-        if pdf3:
-            e3[1].download_button("📄 3D PDF", pdf3, "3d_model.pdf", "application/pdf")
 
 # ──────── TAB 3: İSTATİSTİK ────────
 with tab3:
@@ -754,6 +678,8 @@ with tab3:
 # ──────── TAB 4: AI RAPORU ────────
 with tab4:
     st.subheader("Yapay Zeka Otomatik Analiz Raporu")
+
+
 
     s_std = ""
     if std_val >= 40:
